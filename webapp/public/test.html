@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skimzy Markdown Preview</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+      line-height: 1.6;
+    }
+    textarea, input, button {
+      width: 100%;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      padding: 0.5rem;
+    }
+    button {
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #4338ca;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 1em;
+      overflow-x: auto;
+    }
+    hr {
+      margin: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🔍 Skimzy Test: Summarize & Learn from a Link</h1>
+
+  <input type="text" id="urlInput" placeholder="Enter URL (e.g. https://en.wikipedia.org/wiki/Nepal)" />
+
+  <button onclick="fetchSummary()">Generate Summary</button>
+
+  <hr>
+
+  <div id="output">Markdown output will appear here...</div>
+
+  <script>
+    async function fetchSummary() {
+      const url = document.getElementById("urlInput").value;
+      if (!url) {
+        alert("Please enter a URL.");
+        return;
+      }
+
+      const response = await fetch("http://localhost:8000/generate-from-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+
+      const markdown = await response.text();
+      document.getElementById("output").innerHTML = marked.parse(markdown);
+    }
+  </script>
+
+</body>
+</html>

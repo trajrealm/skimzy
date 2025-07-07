@@ -1,0 +1,7 @@
+### Generate Summary and Flashcards
+POST http://localhost:8000/generate-from-url
+Content-Type: application/json
+
+{
+    "url": "https://en.wikipedia.org/wiki/Nepal"
+}
