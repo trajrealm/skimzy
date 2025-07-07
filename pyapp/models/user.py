@@ -11,4 +11,4 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships (to be defined later)
-    library_items = relationship("LibraryItem", back_populates="owner", cascade="all, delete")
+    library_items = relationship("LibraryItem", back_populates="user", cascade="all, delete")

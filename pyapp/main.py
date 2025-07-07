@@ -4,6 +4,7 @@ from fastapi import Request, Response
 from pyapp.utils.parser import extract_main_content
 from pyapp.services.content_generator import generate_summary_and_flashcards
 from fastapi.middleware.cors import CORSMiddleware
+from pyapp.api.routes import auth
 
 app = FastAPI()
 
@@ -15,6 +16,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 @app.get("/extract")
 def extract(url: str = Query(...)):
