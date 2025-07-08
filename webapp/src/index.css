@@ -2,3 +2,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    button, a {
+      @apply cursor-pointer transition;
+    }
+    button:hover, a:hover {
+      @apply brightness-95;
+    }
+  }
+
+.perspective {
+    perspective: 1000px;
+  }
+  .transform-style-preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+  
+button,
+a,
+[role="button"],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover,
+a:hover {
+  filter: brightness(0.97);
+}
+

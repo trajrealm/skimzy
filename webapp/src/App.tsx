@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import LibraryPage from './pages/LibraryPage';
+import LibraryItemDetailPage from "./pages/LibraryItemDetailPage";
 
 // Optional: a Protected Route wrapper
 function PrivateRoute({ children }: { children: JSX.Element }) {
@@ -19,6 +20,14 @@ function App() {
             element={
               <PrivateRoute>
                 <LibraryPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/library/:id"
+            element={
+              <PrivateRoute>
+                <LibraryItemDetailPage />
               </PrivateRoute>
             }
           />
