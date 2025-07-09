@@ -1,42 +1,69 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+interface Flashcard {
+  question: string;
+  answer: string;
+}
+
+interface MCQ {
+  question: string;
+  options: string[];
+  answer: string;
+}
+
+interface LibraryItem {
+  id: number;
+  title: string;
+  source: string;
+  created_at: string;
+  summary: string;
+  flashcards: Flashcard[];
+  mcqs: MCQ[];
+}
 
 const LibraryItemDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { token } = useAuth();
 
+  const [item, setItem] = useState<LibraryItem | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"summary" | "flashcards" | "mcqs">("summary");
   const [flashIndex, setFlashIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [qIndex: number]: string }>({});
   const [mcqIndex, setMcqIndex] = useState(0);
 
+  useEffect(() => {
+    const fetchItem = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/library/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-  const mockItem = {
-    title: "The Science Behind Black Holes",
-    source: "https://example.com/blackholes",
-    dateAdded: "2025-07-08",
-    summary: "Black holes are regions in space where gravity is so strong...",
-    flashcards: [
-      { question: "What is a black hole?", answer: "A region of spacetime where gravity is extreme." },
-      { question: "What is the event horizon?", answer: "The boundary beyond which nothing can escape." },
-    ],
-    mcqs: [
-      {
-        question: "What causes a black hole to form?",
-        options: ["Supernova", "Big Bang", "Asteroid impact", "Galaxy collision"],
-        answer: "Supernova",
-      },
-      {
-        question: "What escapes a black hole?",
-        options: ["Light", "Radiation", "Nothing", "Time"],
-        answer: "Nothing",
-      },
-    ],
-  };
+        if (!res.ok) throw new Error("Failed to fetch item");
+        const data = await res.json();
+        setItem(data);
+      } catch (err) {
+        console.error("Error loading item:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const flashcard = mockItem.flashcards[flashIndex];
+    fetchItem();
+  }, [id, token]);
+
+  if (loading) return <div className="p-6 text-center">Loading...</div>;
+  if (!item) return <div className="p-6 text-center text-red-500">Item not found.</div>;
+
+  const flashcard = item.flashcards?.[flashIndex];
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -46,11 +73,11 @@ const LibraryItemDetailPage: React.FC = () => {
       </button>
 
       <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-2xl font-bold">{mockItem.title}</h1>
-        <a href={mockItem.source} className="text-sm text-blue-500 hover:underline" target="_blank" rel="noreferrer">
-          {mockItem.source}
+        <h1 className="text-2xl font-bold">{item.title}</h1>
+        <a href={item.source} className="text-sm text-blue-500 hover:underline" target="_blank" rel="noreferrer">
+          {item.source}
         </a>
-        <p className="text-xs text-gray-500 mb-4">Added on: {mockItem.dateAdded}</p>
+        <p className="text-xs text-gray-500 mb-4">Added on: {item.created_at}</p>
 
         {/* Tabs */}
         <div className="flex space-x-4 border-b mb-6">
@@ -62,8 +89,7 @@ const LibraryItemDetailPage: React.FC = () => {
                 setFlashIndex(0);
                 setShowBack(false);
               }}
-              className={`pb-2 px-2 capitalize border-b-2 ${activeTab === tab ? "border-indigo-600 text-indigo-600 font-medium" : "border-transparent text-gray-500"
-                }`}
+              className={`pb-2 px-2 capitalize border-b-2 ${activeTab === tab ? "border-indigo-600 text-indigo-600 font-medium" : "border-transparent text-gray-500"}`}
             >
               {tab === "mcqs" ? "MCQs" : tab}
             </button>
@@ -74,94 +100,50 @@ const LibraryItemDetailPage: React.FC = () => {
         {activeTab === "summary" && (
           <div>
             <h2 className="text-xl font-semibold mb-2">Summary</h2>
-            <p className="text-gray-800 leading-relaxed">{mockItem.summary}</p>
+            <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{item.summary}</p>
           </div>
         )}
 
         {/* Flashcards */}
-        {activeTab === "flashcards" && (
+        {activeTab === "flashcards" && item.flashcards?.length > 0 && (
           <div className="flex flex-col items-center space-y-4">
-            {/* Flashcard Flip Container */}
             <div className="w-full sm:w-[400px] h-[200px] perspective" onClick={() => setShowBack(!showBack)}>
-              <div
-                className={`relative w-full h-full transition-transform duration-500 transform-style-preserve-3d ${showBack ? "rotate-y-180" : ""
-                  }`}
-              >
-                {/* Front Side */}
-                <div
-                  className="absolute w-full h-full flex items-center justify-center text-center
-             bg-indigo-50 text-lg font-medium border rounded-xl backface-hidden
-             cursor-pointer hover:shadow-xl hover:bg-indigo-100 transition duration-300"
-                  title="Click to flip the card"
-                >
-                  {flashcard.question}
+              <div className={`relative w-full h-full transition-transform duration-500 transform-style-preserve-3d ${showBack ? "rotate-y-180" : ""}`}>
+                <div className="absolute w-full h-full flex items-center justify-center text-center bg-indigo-50 text-lg font-medium border rounded-xl backface-hidden cursor-pointer hover:shadow-xl hover:bg-indigo-100 transition duration-300">
+                  {flashcard?.question}
                 </div>
-                {/* Back Side */}
-                <div
-                  className="absolute w-full h-full flex items-center justify-center text-center
-             bg-indigo-100 text-lg font-medium border rounded-xl backface-hidden rotate-y-180
-             cursor-pointer hover:shadow-xl hover:bg-indigo-200 transition duration-300"
-                  title="Click to flip the card"
-                >
-                  {flashcard.answer}
-                </div>      </div>
+                <div className="absolute w-full h-full flex items-center justify-center text-center bg-indigo-100 text-lg font-medium border rounded-xl backface-hidden rotate-y-180 cursor-pointer hover:shadow-xl hover:bg-indigo-200 transition duration-300">
+                  {flashcard?.answer}
+                </div>
+              </div>
             </div>
-
-            {/* Navigation Buttons */}
             <div className="flex space-x-4">
-              <button
-                onClick={() => {
-                  setFlashIndex((prev) => Math.max(0, prev - 1));
-                  setShowBack(false);
-                }}
-                disabled={flashIndex === 0}
-                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-40"
-              >
+              <button onClick={() => { setFlashIndex((prev) => Math.max(0, prev - 1)); setShowBack(false); }} disabled={flashIndex === 0} className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-40">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <button
-                onClick={() => {
-                  setShowBack(false);
-                  setFlashIndex((prev) => Math.min(mockItem.flashcards.length - 1, prev + 1));
-                }}
-                disabled={flashIndex === mockItem.flashcards.length - 1}
-                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-40"
-              >
+              <button onClick={() => { setShowBack(false); setFlashIndex((prev) => Math.min(item.flashcards.length - 1, prev + 1)); }} disabled={flashIndex === item.flashcards.length - 1} className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-40">
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
-
-            <p className="text-sm text-gray-500">
-              Card {flashIndex + 1} of {mockItem.flashcards.length}
-            </p>
+            <p className="text-sm text-gray-500">Card {flashIndex + 1} of {item.flashcards.length}</p>
           </div>
         )}
 
-
         {/* MCQs */}
-        {activeTab === "mcqs" && (
+        {activeTab === "mcqs" && item.mcqs?.length > 0 && (
           <div className="flex flex-col items-center space-y-6">
-            {/* MCQ Slider */}
             <div className="w-full">
               <p className="font-medium text-gray-800 mb-2 text-lg">
-                {mcqIndex + 1}. {mockItem.mcqs[mcqIndex].question}
+                {mcqIndex + 1}. {item.mcqs[mcqIndex].question}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {mockItem.mcqs[mcqIndex].options.map((opt) => {
+                {item.mcqs[mcqIndex].options.map((opt) => {
                   const selected = selectedAnswers[mcqIndex] === opt;
                   return (
                     <button
                       key={opt}
-                      onClick={() =>
-                        setSelectedAnswers((prev) => ({
-                          ...prev,
-                          [mcqIndex]: opt,
-                        }))
-                      }
-                      className={`border px-3 py-2 rounded text-left transition ${selected
-                          ? "bg-indigo-100 border-indigo-500 text-indigo-700"
-                          : "bg-white border-gray-300 hover:bg-gray-50"
-                        }`}
+                      onClick={() => setSelectedAnswers((prev) => ({ ...prev, [mcqIndex]: opt }))}
+                      className={`border px-3 py-2 rounded text-left transition ${selected ? "bg-indigo-100 border-indigo-500 text-indigo-700" : "bg-white border-gray-300 hover:bg-gray-50"}`}
                     >
                       {opt}
                     </button>
@@ -170,49 +152,25 @@ const LibraryItemDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Navigation Controls */}
             <div className="flex space-x-4">
-              <button
-                onClick={() => setMcqIndex((prev) => Math.max(0, prev - 1))}
-                disabled={mcqIndex === 0}
-                className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-40"
-              >
+              <button onClick={() => setMcqIndex((prev) => Math.max(0, prev - 1))} disabled={mcqIndex === 0} className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-40">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <button
-                onClick={() => setMcqIndex((prev) => Math.min(mockItem.mcqs.length - 1, prev + 1))}
-                disabled={mcqIndex === mockItem.mcqs.length - 1}
-                className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-40"
-              >
+              <button onClick={() => setMcqIndex((prev) => Math.min(item.mcqs.length - 1, prev + 1))} disabled={mcqIndex === item.mcqs.length - 1} className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-40">
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Footer Actions */}
             <div className="flex space-x-4 mt-6">
-              <button
-                onClick={() => {
-                  // TODO: Score logic
-                  alert("Scoring feature coming soon!");
-                }}
-                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
-              >
+              <button onClick={() => alert("Scoring feature coming soon!")} className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">
                 Score
               </button>
-              <button
-                onClick={() => {
-                  setSelectedAnswers({});
-                  setMcqIndex(0);
-                }}
-                className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-              >
+              <button onClick={() => { setSelectedAnswers({}); setMcqIndex(0); }} className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300">
                 Reset
               </button>
             </div>
           </div>
         )}
-
-
       </div>
     </div>
   );

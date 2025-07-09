@@ -13,24 +13,26 @@ You are an assistant helping students learn from articles efficiently.
 ARTICLE:
 {text}
 
-TASKS:
-1. Summarize the article using Markdown:
-   - Use clear headings (##) for each section
-   - Use bullet points or numbered lists where needed
+TASKS: 
+Return the result as JSON like this:
+{{
+  "title": "A short descriptive title",
+  "summary": "Summarized markdown here with ## headings and bullet points.",
+  "flashcards": [
+    {{"question": "Q1", "answer": "A1"}},
+    ...
+  ],
+  "mcqs": [
+    {{
+      "question": "Q1",
+      "options": ["A", "B", "C", "D"],
+      "answer": "B"
+    }},
+    ...
+  ]
+}}
 
-2. Create 5 flashcards formatted as:
-
-### Flashcard 1
-**Q:** Question here  
-**A:** Answer here
-
-3. Create 5 quiz-style Q&A pairs like:
-
-### Quiz Question 1
-**Q:** Question  
-**A:** Answer
-
-Respond ONLY in Markdown, clearly formatted and structured.
+DO NOT RETURN LEADING OR TRAILING QUOTES like ``` or JSON
 """
 
     try:
@@ -42,7 +44,7 @@ Respond ONLY in Markdown, clearly formatted and structured.
         )
         content = response.choices[0].message.content
         
-        return {"output": content}
+        return {"output": content.replace("```", "")}
 
     except Exception as e:
         return {"error": str(e)}

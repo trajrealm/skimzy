@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum, DateTime, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from datetime import datetime
 from pyapp.db.base import Base
 import enum
 
@@ -15,18 +17,21 @@ class LibraryItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     url_or_path = Column(String, nullable=False)
-    
-    # ✅ Enum stored as string (no custom PostgreSQL ENUM type)
+
     content_type = Column(Enum(ContentType), nullable=False, default=ContentType.url)
-    
     title = Column(String, nullable=True)
-    created_at = Column(String, nullable=False)
-    updated_at = Column(String, nullable=False)
+
+    summary = Column(Text, nullable=True)
+    flashcards = Column(JSONB, nullable=True)
+    mcqs = Column(JSONB, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     user = relationship("User", back_populates="library_items")
 
     generated_contents = relationship(
-    "GeneratedContent",
-    back_populates="library_item",
-    cascade="all, delete-orphan"
-)
+        "GeneratedContent",
+        back_populates="library_item",
+        cascade="all, delete-orphan"
+    )
