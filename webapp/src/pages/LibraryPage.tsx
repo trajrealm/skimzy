@@ -35,7 +35,6 @@ const LibraryPage: React.FC = () => {
       }
       const data = await res.json();
 
-      console.log("data", data);
       // Adapt backend response to LibraryItem type used by LibraryItemCard
       const adaptedItems: LibraryItem[] = data.map((item: any) => ({
         id: item.id.toString(),
@@ -91,7 +90,6 @@ const LibraryPage: React.FC = () => {
   };
 
   const handleView = (id: string) => {
-    console.log("View item", id);
     navigate(`/library/${id}`);
     // Navigate to detail page or open modal
   };

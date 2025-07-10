@@ -1,5 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { BookOpen } from "lucide-react";
+
 
 interface LibraryItem {
   id: string;
@@ -38,52 +40,62 @@ const LibraryItemCard: React.FC<{ item: LibraryItem; onDelete: (id: string) => v
 
   return (
     <div
-      className={`rounded-xl border-2 ${border} ${bg} p-4 shadow-md transform transition duration-300 hover:scale-105 hover:shadow-xl`}
+      className={`rounded-xl border-2 ${border} ${bg} p-4 shadow-md transform transition duration-300 hover:scale-105 hover:shadow-xl h-full flex flex-col justify-between`}
     >
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <span className="text-xl">{emoji}</span> {item.title}
-          </h3>
-          <a
-            href={item.source}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:underline"
+      {/* Top Section */}
+      <div>
+        <div className="flex justify-between items-start mb-2">
+          <div className="min-h-[3.5rem]">
+            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 line-clamp-2">
+              <span className="text-xl">{emoji}</span> {item.title}
+            </h3>
+          </div>
+          <button
+            onClick={() => onDelete(item.id)}
+            className="text-gray-400 hover:text-red-600 text-xl"
+            aria-label="Delete"
           >
-            Source
-          </a>
-          <p className="text-xs text-gray-500">{new Date(item.dateAdded).toLocaleDateString()}</p>
+            🗑️
+          </button>
         </div>
-        <button
-          onClick={() => onDelete(item.id)}
-          className="text-gray-400 hover:text-red-600 text-xl"
-          aria-label="Delete"
+  
+        <a
+          href={item.source}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-blue-600 hover:underline block"
         >
-          🗑️
+          Source
+        </a>
+        <p className="text-xs text-gray-500 mb-3">
+          Added on: {new Date(item.dateAdded).toLocaleDateString()}
+        </p>
+  
+        <div className="flex flex-wrap gap-2">
+          {item.hasSummary && (
+            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Summary</span>
+          )}
+          {item.hasFlashcards && (
+            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Flashcards</span>
+          )}
+          {item.hasQA && (
+            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">Q&A</span>
+          )}
+        </div>
+      </div>
+  
+      {/* Bottom Section - Button */}
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => navigate(`/library/${item.id}`)}
+          className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition"
+        >
+          <BookOpen className="w-4 h-4" />Skim Now
+          
         </button>
       </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {item.hasSummary && (
-          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Summary</span>
-        )}
-        {item.hasFlashcards && (
-          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Flashcards</span>
-        )}
-        {item.hasQA && (
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">Q&A</span>
-        )}
-      </div>
-
-      <button
-        onClick={() => navigate(`/library/${item.id}`)}
-        className="mt-4 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 self-start transition"
-      >
-        View Details
-      </button>
     </div>
-  );
+  );    
 };
 
 export default LibraryItemCard;

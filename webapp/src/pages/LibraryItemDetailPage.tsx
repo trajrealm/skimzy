@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import Header from "../components/Header";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw  from "rehype-raw";
+import ChatWidget from "../components/ChatWidget";
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -45,6 +46,9 @@ const LibraryItemDetailPage: React.FC = () => {
   const [showScore, setShowScore] = useState(false);
   const [score, setScore] = useState(0);
 
+  const [chatOpen, setChatOpen] = useState(false);
+
+
   useEffect(() => {
     const fetchItem = async () => {
       try {
@@ -70,7 +74,6 @@ const LibraryItemDetailPage: React.FC = () => {
   if (loading) return <div className="p-6 text-center">Loading...</div>;
   if (!item) return <div className="p-6 text-center text-red-500">Item not found.</div>;
 
-  console.log("item", item);
 
   const flashcard = item.flashcards?.[flashIndex];
 
@@ -294,6 +297,7 @@ const LibraryItemDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+      <ChatWidget libraryItemId={item.id} />
     </>
   );
 };

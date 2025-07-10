@@ -35,3 +35,6 @@ class LibraryItem(Base):
         back_populates="library_item",
         cascade="all, delete-orphan"
     )
+
+    chat_history = relationship("ChatHistory", back_populates="library_item", cascade="all, delete-orphan")
+
