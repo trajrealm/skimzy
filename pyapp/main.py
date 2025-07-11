@@ -10,6 +10,7 @@ from pyapp.utils.parser import extract_main_content
 from pyapp.services.content_generator import generate_summary_and_flashcards
 from pyapp.api.routes import auth
 from pyapp.api.routes import library_items as lib
+from pyapp.api.routes import pdf_upload
 from pyapp.models.library_item import LibraryItem
 
 import json
@@ -28,6 +29,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(lib.router)
+app.include_router(pdf_upload.router)
 
 @app.get("/extract")
 def extract(url: str = Query(...)):

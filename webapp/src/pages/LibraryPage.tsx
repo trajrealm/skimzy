@@ -3,48 +3,44 @@ import Header from "../components/Header";
 import AddContentForm from "../components/AddContentForm";
 import LibraryItemCard, { LibraryItem } from "../components/LibraryItemCard";
 import { useNavigate } from "react-router-dom";
-
+import { Loader2 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const LibraryPage: React.FC = () => {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const token = localStorage.getItem("access_token");
   const navigate = useNavigate();
 
-
-  // Load library items from backend on mount
   useEffect(() => {
     fetchLibraryItems();
   }, []);
 
-  // Fetch /library endpoint
   const fetchLibraryItems = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/library`, {
         headers: {
           "Content-Type": "application/json",
-          // Add Authorization header if needed, e.g.
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-      if (!res.ok) {
-        throw new Error("Failed to fetch library items");
-      }
+      if (!res.ok) throw new Error("Failed to fetch library items");
+
       const data = await res.json();
 
-      // Adapt backend response to LibraryItem type used by LibraryItemCard
       const adaptedItems: LibraryItem[] = data.map((item: any) => ({
         id: item.id.toString(),
         title: item.title,
-        source: item.source, // no source in backend? Could add if you want
+        source: item.source,
         dateAdded: item.created_at,
         hasSummary: !!item.snippet,
-        hasFlashcards: false, // backend doesn't return these flags yet; update when ready
+        hasFlashcards: false,
         hasQA: false,
       }));
+
       setItems(adaptedItems);
     } catch (error) {
       console.error(error);
@@ -53,58 +49,64 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  // Handle adding new URL or file: call generate-from-url backend, then refresh list
   const handleAdd = async (urlOrFile: string | File) => {
-    let url = "";
-    if (typeof urlOrFile === "string") {
-      url = urlOrFile;
-    } else {
-      // If file upload, handle file upload logic here or disable for now
-      alert("File upload not implemented yet");
-      return;
-    }
-
+    setIsGenerating(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/generate-from-url`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`, // Add Authorization header if needed
-        },
-        body: JSON.stringify({ url }),
-      });
+      if (typeof urlOrFile === "string") {
+        const res = await fetch(`${BACKEND_URL}/generate-from-url`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ url: urlOrFile }),
+        });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        alert("Error: " + (errorData.detail || "Failed to add item"));
-        return;
+        if (!res.ok) {
+          const errorData = await res.json();
+          alert("Error: " + (errorData.detail || "Failed to add item"));
+          return;
+        }
+      } else {
+        const formData = new FormData();
+        formData.append("file", urlOrFile);
+
+        const res = await fetch(`${BACKEND_URL}/upload_pdf/process`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          alert("Error: " + (errorData.detail || "Failed to upload PDF"));
+          return;
+        }
       }
 
-      const savedItem = await res.json();
-      // After successful save, reload library items list
       await fetchLibraryItems();
     } catch (error) {
-      console.error(error);
+      console.error("Add failed:", error);
       alert("Failed to add item");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   const handleView = (id: string) => {
     navigate(`/library/${id}`);
-    // Navigate to detail page or open modal
   };
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/library/${id}`, {
+      const response = await fetch(`${BACKEND_URL}/library/${id}`, {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${token}`, // Make sure you pass the auth token here
+          Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (response.status === 204) {
-        // Success: update UI
         setItems(items.filter((i) => i.id !== id));
       } else {
         const data = await response.json();
@@ -115,12 +117,13 @@ const LibraryPage: React.FC = () => {
       alert("Error deleting item. See console for details.");
     }
   };
-  
+
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 relative">
       <Header />
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
-        <AddContentForm onAdd={handleAdd} />
+      <main className="max-w-5xl mx-auto p-6 space-y-6 relative z-10">
+        <AddContentForm onAdd={handleAdd} isGenerating={isGenerating} />
+
         {loading && <div className="text-center">Loading...</div>}
         {!loading && items.length === 0 && (
           <div className="text-center text-gray-500 mt-12">
@@ -140,6 +143,16 @@ const LibraryPage: React.FC = () => {
           </div>
         )}
       </main>
+
+      {isGenerating && (
+        <div className="fixed inset-0 z-50 bg-white/60 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-700 text-lg font-medium">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            Preparing your data to make Sikm Ready....
+            ...
+          </div>
+        </div>
+      )}
     </div>
   );
 };
