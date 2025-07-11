@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Header from "../components/Header";
 import AddContentForm from "../components/AddContentForm";
 import LibraryItemCard, { LibraryItem } from "../components/LibraryItemCard";
@@ -14,11 +14,18 @@ const LibraryPage: React.FC = () => {
   const token = localStorage.getItem("access_token");
   const navigate = useNavigate();
 
+  const didFetchRef = useRef(false);
+
   useEffect(() => {
-    fetchLibraryItems();
+    if (!didFetchRef.current) {
+      console.log("useEffect called");
+      fetchLibraryItems();
+      didFetchRef.current = true;        
+    }
   }, []);
 
   const fetchLibraryItems = async () => {
+    console.log("fetchLibraryItems called");
     setLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/library`, {
@@ -50,6 +57,7 @@ const LibraryPage: React.FC = () => {
   };
 
   const handleAdd = async (urlOrFile: string | File) => {
+    console.log("handleAdd called");
     setIsGenerating(true);
     try {
       if (typeof urlOrFile === "string") {
@@ -94,6 +102,7 @@ const LibraryPage: React.FC = () => {
   };
 
   const handleView = (id: string) => {
+    console.log("handleView called");
     navigate(`/library/${id}`);
   };
 

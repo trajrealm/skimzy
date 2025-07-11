@@ -12,6 +12,7 @@ const AddContentForm: React.FC<AddContentFormProps> = ({ onAdd, isGenerating }) 
   const [file, setFile] = useState<File | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("handleFileChange called");
     const selected = e.target.files?.[0];
     if (selected && selected.type === "application/pdf") {
       setFile(selected);
@@ -19,6 +20,7 @@ const AddContentForm: React.FC<AddContentFormProps> = ({ onAdd, isGenerating }) 
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("handleSubmit called");
     e.preventDefault();
     if (isGenerating) return;
 
