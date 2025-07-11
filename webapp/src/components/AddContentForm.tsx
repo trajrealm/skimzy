@@ -105,7 +105,7 @@ const AddContentForm: React.FC<AddContentFormProps> = ({ onAdd, isGenerating }) 
         {isGenerating ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Preparing your data to make Sikm Ready....
+            Preparing your data to make Skim Ready....
           </>
         ) : (
           <>
