@@ -32,6 +32,10 @@ Return the result as JSON like this:
   ]
 }}
 
+- "summary" should be very descriptive without missing any important and critical points.
+- "flashcards" should be around 10 or more objects depending on the number of paragraphs in the article. If article is short, you can return less flashcards.
+- "mcqs" should be around 10 or more objects depending on the number of paragraphs in the article. If article is short, you can return less mcqs.
+
 DO NOT RETURN LEADING OR TRAILING QUOTES like ``` or JSON
 """
 
