@@ -92,7 +92,7 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
     }`}
   >
     <div
-      className={`p-2 rounded-lg ${
+      className={`p-2 rounded-lg whitespace-pre-line ${
         msg.role === "user" ? "bg-indigo-100" : "bg-gray-100"
       }`}
     >
