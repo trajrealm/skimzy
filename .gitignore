@@ -13,6 +13,7 @@ src/static/plots/*
 !**/*.example
 test/*
 node_modules
+**/qdrant**
 
 # Logs
 logs
