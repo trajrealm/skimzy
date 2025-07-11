@@ -21,14 +21,16 @@ def ask_llm(question: str, context_chunks: List[str]) -> str:
         {
             "role": "system",
             "content": (
-                "You are a helpful assistant. Use only the provided context to answer the user's question. "
-                "If the answer is not in the context, say you don't know."
+                "You are a helpful assistant. First, try to answer the user's question strictly using the provided context. "
+                "If the answer is not found in the context, then you may use your broader knowledge, but make it clear by starting your answer with: "
+                "NOTE:This answer is not in the provided context. However, based on my wider knowledge, here is a possible answer:\n\n"
+                "[your answer here]"
             )
         },
         {
             "role": "user",
             "content": f"Context:\n{context_text}\n\nQuestion: {question}"
-        }
+        }    
     ]
 
     response = client.chat.completions.create(
