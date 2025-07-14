@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { UserCircle2, LogOut } from "lucide-react";
 
 const Header: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -29,7 +29,7 @@ const Header: React.FC = () => {
           <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg z-50">
             <div className="px-4 py-2 border-b text-sm text-gray-600">
               {/* Replace with real email if available */}
-              Logged in as <br /><span className="font-semibold">user@example.com</span>
+              Logged in as <br /><span className="font-semibold">{user?.email || "Unknown User"}</span>
             </div>
             <button
               onClick={handleLogout}
