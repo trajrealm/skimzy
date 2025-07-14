@@ -1,12 +1,13 @@
 import os
 from qdrant_client import QdrantClient
+from pyapp.config.settings import settings
 
 def get_qdrant_client():
-    host = os.getenv("QDRANT_HOST", "localhost")
-    port = int(os.getenv("QDRANT_PORT", 6333))
-    api_key = os.getenv("QDRANT_API_KEY", None)
-    use_https = os.getenv("QDRANT_USE_HTTPS", "false").lower() == "true"
-
+    host = settings.QDRANT_HOST
+    port = settings.QDRANT_PORT
+    api_key = settings.QDRANT_API_KEY
+    use_https = settings.QDRANT_USE_HTTPS
+    
     if api_key:
         return QdrantClient(
             host=host,

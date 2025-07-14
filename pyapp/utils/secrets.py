@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
-
-load_dotenv()
+from pyapp.config.settings import settings
 
 def get_openai_api_key():
-    return os.getenv("OPENAI_API_KEY")
+    return settings.OPENAI_API_KEY

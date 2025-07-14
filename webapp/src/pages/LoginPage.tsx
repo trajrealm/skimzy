@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export default function AuthPage() {
   const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
@@ -31,8 +33,8 @@ export default function AuthPage() {
 
     try {
       const url = isLogin
-        ? "http://localhost:8000/auth/login"
-        : "http://localhost:8000/auth/signup";
+        ? `${BACKEND_URL}/auth/login`
+        : `${BACKEND_URL}/auth/signup`;
 
       let options: RequestInit;
 

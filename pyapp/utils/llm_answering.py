@@ -1,6 +1,6 @@
 from openai import OpenAI
 from typing import List
-from pyapp.config import settings
+from pyapp.config.settings import settings
 
 client = OpenAI()
 
@@ -34,7 +34,7 @@ def ask_llm(question: str, context_chunks: List[str]) -> str:
     ]
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=settings.LLM_MODEL,
         messages=messages,
         temperature=0.3,
     )

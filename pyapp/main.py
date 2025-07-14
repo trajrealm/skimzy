@@ -12,6 +12,7 @@ from pyapp.api.routes import auth
 from pyapp.api.routes import library_items as lib
 from pyapp.api.routes import pdf_upload
 from pyapp.models.library_item import LibraryItem
+from pyapp.config.settings import settings
 
 import json
 import traceback
@@ -119,7 +120,7 @@ async def generate_from_url(
                 }
             })
 
-        client.upsert(collection_name="skimzy_vectors", points=points)
+        client.upsert(collection_name=settings.QDRANT_APP_VECTOR, points=points)
 
         # Return the created library item info
         return {
@@ -173,7 +174,7 @@ async def ask_question(
     )
 
     search_results = client.search(
-        collection_name="skimzy_vectors",
+        collection_name=settings.QDRANT_APP_VECTOR,
         query_vector=query_embedding,
         limit=5,
         query_filter=qdrant_filter,
