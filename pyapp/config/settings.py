@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     EMBEDDINGS_MODEL: str = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
 
     DATABASE_URL: str = os.getenv("DATABASE_URL")
+    DATABASE_SCHEMA: str = os.getenv("DATABASE_SCHEMA", "public")
     
     QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
     QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", 6333))

@@ -7,6 +7,7 @@ Create Date: 2025-07-10 11:34:31.488918
 """
 from alembic import op
 import sqlalchemy as sa
+from pyapp.config.settings import settings
 
 
 # revision identifiers, used by Alembic.
@@ -21,12 +22,13 @@ def upgrade():
         'chat_history',
         sa.Column('id', sa.Integer(), primary_key=True),
         sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('library_item_id', sa.Integer(), sa.ForeignKey('library_items.id'), nullable=False),
+        sa.Column('library_item_id', sa.Integer(), sa.ForeignKey(f'{settings.DATABASE_SCHEMA}.library_items.id'), nullable=False),
         sa.Column('question', sa.Text(), nullable=False),
         sa.Column('answer', sa.Text(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
+        schema=settings.DATABASE_SCHEMA
     )
 
 
 def downgrade():
-    op.drop_table('chat_history')
+    op.drop_table('chat_history', schema=settings.DATABASE_SCHEMA)

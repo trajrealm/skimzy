@@ -18,7 +18,7 @@ class LibraryItem(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     url_or_path = Column(String, nullable=False)
 
-    content_type = Column(Enum(ContentType), nullable=False, default=ContentType.url)
+    content_type = Column(Enum(ContentType, name="content_type_enum"), nullable=False, default=ContentType.url)
     title = Column(String, nullable=True)
 
     summary = Column(Text, nullable=True)
