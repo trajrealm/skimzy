@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Header from "../components/Header";
 import AddContentForm from "../components/AddContentForm";
 import LibraryItemCard, { LibraryItem } from "../components/LibraryItemCard";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -12,7 +12,7 @@ const LibraryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const token = localStorage.getItem("access_token");
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
   const didFetchRef = useRef(false);
 
@@ -101,10 +101,10 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  const handleView = (id: string) => {
-    console.log("handleView called");
-    navigate(`/library/${id}`);
-  };
+  // const handleView = (id: string) => {
+  //   console.log("handleView called");
+  //   navigate(`/library/${id}`);
+  // };
 
   const handleDelete = async (id: string) => {
     try {
@@ -146,7 +146,6 @@ const LibraryPage: React.FC = () => {
                 key={item.id}
                 item={item}
                 onDelete={handleDelete}
-                onClick={handleView}
               />
             ))}
           </div>

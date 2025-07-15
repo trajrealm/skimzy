@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {  Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import LibraryPage from './pages/LibraryPage';
 import LibraryItemDetailPage from "./pages/LibraryItemDetailPage";
+import type { JSX } from "react";
 
 // Optional: a Protected Route wrapper
 function PrivateRoute({ children }: { children: JSX.Element }) {

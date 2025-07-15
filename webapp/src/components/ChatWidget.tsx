@@ -25,7 +25,7 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
       .then(res => res.json())
       .then(data => {
         // Sort by created_at if available
-        const msgs = data.flatMap(({ question, answer, timestamp }) => [
+        const msgs = data.flatMap(({ question, answer, timestamp }: { question: string; answer: string; timestamp?: string}) => [
           { role: "user", text: question, timestamp },
           { role: "assistant", text: answer, timestamp },
         ]);

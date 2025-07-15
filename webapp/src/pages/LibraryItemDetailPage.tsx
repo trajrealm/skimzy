@@ -46,7 +46,7 @@ const LibraryItemDetailPage: React.FC = () => {
   const [showScore, setShowScore] = useState(false);
   const [score, setScore] = useState(0);
 
-  const [chatOpen, setChatOpen] = useState(false);
+  // const [chatOpen, setChatOpen] = useState(false);
 
 
   useEffect(() => {
