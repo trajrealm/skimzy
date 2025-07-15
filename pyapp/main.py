@@ -3,6 +3,9 @@ from fastapi import Query, FastAPI
 from fastapi import Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 
 from pyapp.db.session import get_db
 from pyapp.utils.auth import get_current_user
@@ -16,8 +19,14 @@ from pyapp.config.settings import settings
 
 import json
 import traceback
+import os
+
+DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "webapp", "dist")
 
 app = FastAPI()
+
+# Serve the frontend React build
+app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +40,14 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(lib.router)
 app.include_router(pdf_upload.router)
+
+@app.get("/")
+def serve_index():
+    return FileResponse(os.path.join(DIST_DIR, "index.html"))
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    return FileResponse(os.path.join(DIST_DIR, "index.html"))
 
 @app.get("/extract")
 def extract(url: str = Query(...)):
