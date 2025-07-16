@@ -96,8 +96,8 @@ async def upload_and_process_pdf(
                 "id": str(uuid4()),
                 "vector": embedding,
                 "payload": {
-                    "user_id": str(user.id),
-                    "library_item_id": str(new_item.id),
+                    "user_id": int(user.id),
+                    "library_item_id": int(new_item.id),
                     "text_chunk": chunk
                 }
             })
