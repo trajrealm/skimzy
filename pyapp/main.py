@@ -21,12 +21,19 @@ import json
 import traceback
 import os
 
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+from pyapp.services.qdrant_client import get_qdrant_client
+from pyapp.utils.embedding import get_openai_embeddings
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+from pyapp.utils.llm_answering import ask_llm
+from pyapp.models.chat_history import ChatHistory
+
+
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "webapp", "dist")
 
 app = FastAPI()
 
-# Serve the frontend React build
-app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,14 +47,6 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(lib.router)
 app.include_router(pdf_upload.router)
-
-@app.get("/")
-def serve_index():
-    return FileResponse(os.path.join(DIST_DIR, "index.html"))
-
-@app.get("/{full_path:path}")
-def spa_fallback(full_path: str):
-    return FileResponse(os.path.join(DIST_DIR, "index.html"))
 
 @app.get("/extract")
 def extract(url: str = Query(...)):
@@ -131,8 +130,8 @@ async def generate_from_url(
                 "id": str(uuid.uuid4()),
                 "vector": embedding,
                 "payload": {
-                    "user_id": str(user.id),
-                    "library_item_id": str(new_item.id),
+                    "user_id": int(user.id),
+                    "library_item_id": int(new_item.id),
                     "text_chunk": chunk,
                 }
             })
@@ -155,69 +154,68 @@ async def generate_from_url(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from pyapp.services.qdrant_client import get_qdrant_client
-from pyapp.utils.embedding import get_openai_embeddings
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from pyapp.utils.llm_answering import ask_llm
-from pyapp.models.chat_history import ChatHistory
-
 
 
 @app.post("/ask-question")
 async def ask_question(
     request: Request,
     db: Session = Depends(get_db),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user)    
 ):
-    body = await request.json()
-    question = body.get("question")
-    library_item_id = body.get("library_item_id")
+    try:
+        body = await request.json()
+        question = body.get("question")
+        library_item_id = body.get("library_item_id")
 
-    if not question or not library_item_id:
-        raise HTTPException(status_code=400, detail="Missing question or library_item_id")
+        if not question or not library_item_id:
+            raise HTTPException(status_code=400, detail="Missing question or library_item_id")
 
-    # Step 1: Get question embedding
-    query_embedding = (await get_openai_embeddings([question]))[0]
+        # Step 1: Get question embedding
+        query_embedding = (await get_openai_embeddings([question]))[0]
 
-    # Step 2: Query Qdrant for matching chunks
-    client = get_qdrant_client()
-    qdrant_filter = Filter(
-        must=[
-            FieldCondition(key="user_id", match=MatchValue(value=str(user.id))),
-            FieldCondition(key="library_item_id", match=MatchValue(value=str(library_item_id)))
-        ]
-    )
+        # Step 2: Query Qdrant for matching chunks
+        client = get_qdrant_client()
 
-    search_results = client.search(
-        collection_name=settings.QDRANT_APP_VECTOR,
-        query_vector=query_embedding,
-        limit=5,
-        query_filter=qdrant_filter,
-        with_payload=True
-    )
+        qdrant_filter = Filter(
+            must=[
+                FieldCondition(key="user_id", match=MatchValue(value=int(user.id))),
+                FieldCondition(key="library_item_id", match=MatchValue(value=int(library_item_id)))
+            ]
+        )
 
-    # Step 3: Extract relevant chunks
-    relevant_chunks = [pt.payload["text_chunk"] for pt in search_results if "text_chunk" in pt.payload]
+        search_results = client.search(
+            collection_name=settings.QDRANT_APP_VECTOR,
+            query_vector=query_embedding,
+            limit=5,
+            query_filter=qdrant_filter,
+            with_payload=True,
+            with_vectors=True
+        )
+        
+        # Step 3: Extract relevant chunks
+        relevant_chunks = [pt.payload["text_chunk"] for pt in search_results if "text_chunk" in pt.payload]
 
-    if not relevant_chunks:
-        raise HTTPException(status_code=404, detail="No relevant content found")
+        if not relevant_chunks:
+            return {"answer": "No relevant content found"}
 
-    # Step 4: Ask GPT model to answer based on retrieved chunks
-    answer = ask_llm(question=question, context_chunks=relevant_chunks)
+        # Step 4: Ask GPT model to answer based on retrieved chunks
+        answer = ask_llm(question=question, context_chunks=relevant_chunks)
 
-    chat_record = ChatHistory(
-        user_id=user.id,
-        library_item_id=library_item_id,
-        question=question,
-        answer=answer
-    )
+        chat_record = ChatHistory(
+            user_id=user.id,
+            library_item_id=library_item_id,
+            question=question,
+            answer=answer
+        )
 
-    db.add(chat_record)
-    db.commit()
+        db.add(chat_record)
+        db.commit()
 
-    return {"answer": answer}
+        return {"answer": answer}
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/chat-history/{library_item_id}")
 def get_chat_history(
@@ -231,7 +229,6 @@ def get_chat_history(
         .order_by(ChatHistory.created_at.asc())
         .all()
     )
-
     return [
         {
             "id": chat.id,
@@ -241,3 +238,16 @@ def get_chat_history(
         }
         for chat in history
     ]
+
+
+# Serve the frontend React build
+app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
+
+@app.get("/")
+def serve_index():
+    return FileResponse(os.path.join(DIST_DIR, "index.html"))
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    return FileResponse(os.path.join(DIST_DIR, "index.html"))
+

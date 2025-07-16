@@ -18,11 +18,13 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
   
   useEffect(() => {
     if (!isOpen || !libraryItemId) return;
-  
     fetch(`${BACKEND_URL}/chat-history/${libraryItemId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch chat history");
+        return res.json();
+      })
       .then(data => {
         // Sort by created_at if available
         const msgs = data.flatMap(({ question, answer, timestamp }: { question: string; answer: string; timestamp?: string}) => [
@@ -31,7 +33,18 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
         ]);
         setMessages(msgs);
       })
-      .catch(console.error);
+      .catch(async (err) => {
+        console.error("Fetch error:", err);
+        try {
+          const res = await fetch(`${BACKEND_URL}/chat-history/${libraryItemId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const text = await res.text();
+          console.error("Raw response text:", text);
+        } catch (e) {
+          console.error("Error fetching or reading raw response:", e);
+        }
+      });
   }, [isOpen, libraryItemId, token]); // These are all primitives or strings — correct
 
   useEffect(() => {
