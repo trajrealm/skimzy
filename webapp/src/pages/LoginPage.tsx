@@ -33,8 +33,8 @@ export default function AuthPage() {
 
     try {
       const url = isLogin
-        ? `${BACKEND_URL}/auth/login`
-        : `${BACKEND_URL}/auth/signup`;
+        ? `${BACKEND_URL}/api/auth/login`
+        : `${BACKEND_URL}/api/auth/signup`;
 
       let options: RequestInit;
 

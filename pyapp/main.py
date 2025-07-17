@@ -1,77 +1,66 @@
-from datetime import datetime
-from fastapi import Query, FastAPI
-from fastapi import Request, Depends, HTTPException
+from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from datetime import datetime
+import traceback
+import uuid
+import json
+import os
 
-
+from pyapp.config.settings import settings
 from pyapp.db.session import get_db
 from pyapp.utils.auth import get_current_user
 from pyapp.utils.parser import extract_main_content
+from pyapp.utils.embedding import get_openai_embeddings
+from pyapp.utils.llm_answering import ask_llm
+from pyapp.utils.text_chunker import chunk_text
 from pyapp.services.content_generator import generate_summary_and_flashcards
+from pyapp.services.qdrant_client import get_qdrant_client
+from pyapp.models.library_item import LibraryItem
+from pyapp.models.chat_history import ChatHistory
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+
+# External routes
 from pyapp.api.routes import auth
 from pyapp.api.routes import library_items as lib
 from pyapp.api.routes import pdf_upload
-from pyapp.models.library_item import LibraryItem
-from pyapp.config.settings import settings
-
-import json
-import traceback
-import os
-
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from pyapp.services.qdrant_client import get_qdrant_client
-from pyapp.utils.embedding import get_openai_embeddings
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from pyapp.utils.llm_answering import ask_llm
-from pyapp.models.chat_history import ChatHistory
-
 
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "webapp", "dist")
 
+# --- Initialize App ---
 app = FastAPI()
 
-
+# --- Middleware ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ✅ You can restrict this later to your domain
+    allow_origins=["*"],  # ⚠️ restrict this in prod
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- Include External Routers ---
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(lib.router, prefix="/api", tags=["library"])
+app.include_router(pdf_upload.router, prefix="/api", tags=["pdf"])
 
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(lib.router)
-app.include_router(pdf_upload.router)
+# --- Internal API Router with prefix ---
+api_router = APIRouter(prefix="/api")
 
-@app.get("/extract")
+@api_router.get("/extract")
 def extract(url: str = Query(...)):
     content = extract_main_content(url)
     return {"length": len(content), "snippet": content}
 
-
-@app.post("/generate")
+@api_router.post("/generate")
 async def generate(request: Request):
     body = await request.json()
     text = body.get("text", "")
     return generate_summary_and_flashcards(text)
 
-from pyapp.utils.parser import extract_main_content
-
-
-
-import uuid
-from fastapi import HTTPException
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from pyapp.services.qdrant_client import get_qdrant_client
-from pyapp.utils.text_chunker import chunk_text
-from pyapp.utils.embedding import get_openai_embeddings
-
-@app.post("/generate-from-url")
+@api_router.post("/generate-from-url")
 async def generate_from_url(
     request: Request,
     db: Session = Depends(get_db),
@@ -83,25 +72,18 @@ async def generate_from_url(
         if not url:
             raise HTTPException(status_code=400, detail="URL is required")
 
-        # Step 1: Extract content
         text = extract_main_content(url)
-
-        # Step 1.5: Chunk the text (e.g., ~500 tokens per chunk)
         chunks = chunk_text(text, chunk_size=500)
-
-        # Step 2: Generate summary + flashcards + mcqs
         result = generate_summary_and_flashcards(text)
 
         try:
             result_dict = json.loads(result["output"])
-        except (KeyError, json.JSONDecodeError) as e:
-            print("Failed to parse result['output']:", e)
-            raise HTTPException(status_code=500, detail="Invalid response format from generation")
+        except (KeyError, json.JSONDecodeError):
+            raise HTTPException(status_code=500, detail="Invalid generation output format")
 
         if "summary" not in result_dict:
             raise HTTPException(status_code=500, detail="Content generation failed")
 
-        # Step 3: Create DB record for the library item
         now = datetime.utcnow()
         new_item = LibraryItem(
             user_id=user.id,
@@ -119,26 +101,24 @@ async def generate_from_url(
         db.commit()
         db.refresh(new_item)
 
-        # Step 4: Generate embeddings for each chunk
-        embeddings = await get_openai_embeddings(chunks)  # assumes async; adapt if sync
-
-        # Step 5: Store embeddings in Qdrant with metadata
+        embeddings = await get_openai_embeddings(chunks)
         client = get_qdrant_client()
-        points = []
-        for chunk, embedding in zip(chunks, embeddings):
-            points.append({
+
+        points = [
+            {
                 "id": str(uuid.uuid4()),
-                "vector": embedding,
+                "vector": emb,
                 "payload": {
                     "user_id": int(user.id),
                     "library_item_id": int(new_item.id),
                     "text_chunk": chunk,
-                }
-            })
+                },
+            }
+            for chunk, emb in zip(chunks, embeddings)
+        ]
 
         client.upsert(collection_name=settings.QDRANT_APP_VECTOR, points=points)
 
-        # Return the created library item info
         return {
             "id": new_item.id,
             "title": new_item.title,
@@ -154,9 +134,7 @@ async def generate_from_url(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
-@app.post("/ask-question")
+@api_router.post("/ask-question")
 async def ask_question(
     request: Request,
     db: Session = Depends(get_db),
@@ -170,10 +148,7 @@ async def ask_question(
         if not question or not library_item_id:
             raise HTTPException(status_code=400, detail="Missing question or library_item_id")
 
-        # Step 1: Get question embedding
         query_embedding = (await get_openai_embeddings([question]))[0]
-
-        # Step 2: Query Qdrant for matching chunks
         client = get_qdrant_client()
 
         qdrant_filter = Filter(
@@ -191,14 +166,12 @@ async def ask_question(
             with_payload=True,
             with_vectors=True
         )
-        
-        # Step 3: Extract relevant chunks
+
         relevant_chunks = [pt.payload["text_chunk"] for pt in search_results if "text_chunk" in pt.payload]
 
         if not relevant_chunks:
             return {"answer": "No relevant content found"}
 
-        # Step 4: Ask GPT model to answer based on retrieved chunks
         answer = ask_llm(question=question, context_chunks=relevant_chunks)
 
         chat_record = ChatHistory(
@@ -214,10 +187,10 @@ async def ask_question(
         return {"answer": answer}
     except Exception as e:
         traceback.print_exc()
-        print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/chat-history/{library_item_id}")
+
+@api_router.get("/chat-history/{library_item_id}")
 def get_chat_history(
     library_item_id: int,
     db: Session = Depends(get_db),
@@ -239,15 +212,23 @@ def get_chat_history(
         for chat in history
     ]
 
+# Register internal API routes
+app.include_router(api_router)
 
-# Serve the frontend React build
+# # --- Static frontend (React/Vite) ---
+# Serve /assets folder inside dist/assets at /assets URL
 app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
 
+# Serve vite.svg at root
+@app.get("/vite.svg")
+async def serve_vite_svg():
+    return FileResponse(os.path.join(DIST_DIR, "vite.svg"))
+
+# Serve index.html for SPA routes
 @app.get("/")
-def serve_index():
+async def serve_index():
     return FileResponse(os.path.join(DIST_DIR, "index.html"))
 
 @app.get("/{full_path:path}")
-def spa_fallback(full_path: str):
+async def spa_fallback(full_path: str):
     return FileResponse(os.path.join(DIST_DIR, "index.html"))
-

@@ -28,7 +28,7 @@ const LibraryPage: React.FC = () => {
     console.log("fetchLibraryItems called");
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/library`, {
+      const res = await fetch(`${BACKEND_URL}/api/library`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -61,7 +61,7 @@ const LibraryPage: React.FC = () => {
     setIsGenerating(true);
     try {
       if (typeof urlOrFile === "string") {
-        const res = await fetch(`${BACKEND_URL}/generate-from-url`, {
+        const res = await fetch(`${BACKEND_URL}/api/generate-from-url`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -79,7 +79,7 @@ const LibraryPage: React.FC = () => {
         const formData = new FormData();
         formData.append("file", urlOrFile);
 
-        const res = await fetch(`${BACKEND_URL}/upload_pdf/process`, {
+        const res = await fetch(`${BACKEND_URL}/api/upload_pdf/process`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
@@ -108,7 +108,7 @@ const LibraryPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/library/${id}`, {
+      const response = await fetch(`${BACKEND_URL}/api/library/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

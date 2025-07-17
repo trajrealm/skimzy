@@ -20,7 +20,7 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
 
   useEffect(() => {
     if (!isOpen || !libraryItemId) return;
-    fetch(`${BACKEND_URL}/chat-history/${libraryItemId}`, {
+    fetch(`${BACKEND_URL}/api/chat-history/${libraryItemId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => {
@@ -38,7 +38,7 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
       .catch(async (err) => {
         console.error("Fetch error:", err);
         try {
-          const res = await fetch(`${BACKEND_URL}/chat-history/${libraryItemId}`, {
+          const res = await fetch(`${BACKEND_URL}/api/chat-history/${libraryItemId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const text = await res.text();
@@ -63,7 +63,7 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
     setInput("");
 
     try {
-      const res = await fetch(`${BACKEND_URL}/ask-question`, {
+      const res = await fetch(`${BACKEND_URL}/api/ask-question`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

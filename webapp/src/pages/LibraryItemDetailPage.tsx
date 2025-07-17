@@ -51,7 +51,7 @@ const LibraryItemDetailPage: React.FC = () => {
   useEffect(() => {
     const fetchItem = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/library/${id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/library/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
