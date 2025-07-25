@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuthContext";
 import { UserCircle2, LogOut } from "lucide-react";
 
 const Header: React.FC = () => {

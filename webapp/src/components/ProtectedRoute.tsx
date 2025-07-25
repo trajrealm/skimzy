@@ -1,5 +1,5 @@
 // src/components/ProtectedRoute.tsx
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuthContext";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 

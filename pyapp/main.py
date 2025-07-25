@@ -27,6 +27,11 @@ from pyapp.api.routes import auth
 from pyapp.api.routes import library_items as lib
 from pyapp.api.routes import pdf_upload
 
+# V1 API routes
+from pyapp.api.v1.routes import auth as auth_v1
+from pyapp.api.v1.routes import library_items as lib_v1
+from pyapp.api.v1.routes import pdf_upload as pdf_v1
+
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "webapp", "dist")
 
 # --- Initialize App ---
@@ -41,14 +46,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Include External Routers ---
+# --- Include External Routers (Legacy - kept for backward compatibility) ---
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(lib.router, prefix="/api", tags=["library"])
 app.include_router(pdf_upload.router, prefix="/api", tags=["pdf"])
 
+# --- Include V1 API Routers ---
+app.include_router(auth_v1.router, prefix="/api/v1/auth", tags=["auth-v1"])
+app.include_router(lib_v1.router, prefix="/api/v1", tags=["library-v1"])
+app.include_router(pdf_v1.router, prefix="/api/v1", tags=["pdf-v1"])
+
 # --- Internal API Router with prefix ---
 api_router = APIRouter(prefix="/api")
 
+# --- V1 Internal API Router ---
+api_v1_router = APIRouter(prefix="/api/v1")
+
+# Legacy endpoints (kept for backward compatibility)
 @api_router.get("/extract")
 def extract(url: str = Query(...)):
     content = extract_main_content(url)
@@ -133,7 +147,6 @@ async def generate_from_url(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @api_router.post("/ask-question")
 async def ask_question(
     request: Request,
@@ -189,7 +202,6 @@ async def ask_question(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @api_router.get("/chat-history/{library_item_id}")
 def get_chat_history(
     library_item_id: int,
@@ -212,8 +224,171 @@ def get_chat_history(
         for chat in history
     ]
 
+# V1 endpoints (recommended)
+@api_v1_router.get("/extract")
+def extract_v1(url: str = Query(...)):
+    content = extract_main_content(url)
+    return {"length": len(content), "snippet": content}
+
+@api_v1_router.post("/generate")
+async def generate_v1(request: Request):
+    body = await request.json()
+    text = body.get("text", "")
+    return generate_summary_and_flashcards(text)
+
+@api_v1_router.post("/generate-from-url")
+async def generate_from_url_v1(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    try:
+        body = await request.json()
+        url = body.get("url")
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+
+        text = extract_main_content(url)
+        chunks = chunk_text(text, chunk_size=500)
+        result = generate_summary_and_flashcards(text)
+
+        try:
+            result_dict = json.loads(result["output"])
+        except (KeyError, json.JSONDecodeError):
+            raise HTTPException(status_code=500, detail="Invalid generation output format")
+
+        if "summary" not in result_dict:
+            raise HTTPException(status_code=500, detail="Content generation failed")
+
+        now = datetime.utcnow()
+        new_item = LibraryItem(
+            user_id=user.id,
+            url_or_path=url,
+            content_type="url",
+            title=result_dict.get("title", "Untitled"),
+            summary=result_dict.get("summary"),
+            flashcards=result_dict.get("flashcards", []),
+            mcqs=result_dict.get("mcqs", []),
+            created_at=now,
+            updated_at=now
+        )
+
+        db.add(new_item)
+        db.commit()
+        db.refresh(new_item)
+
+        embeddings = await get_openai_embeddings(chunks)
+        client = get_qdrant_client()
+
+        points = [
+            {
+                "id": str(uuid.uuid4()),
+                "vector": emb,
+                "payload": {
+                    "user_id": int(user.id),
+                    "library_item_id": int(new_item.id),
+                    "text_chunk": chunk,
+                },
+            }
+            for chunk, emb in zip(chunks, embeddings)
+        ]
+
+        client.upsert(collection_name=settings.QDRANT_APP_VECTOR, points=points)
+
+        return {
+            "id": new_item.id,
+            "title": new_item.title,
+            "source": new_item.url_or_path,
+            "created_at": new_item.created_at.isoformat(),
+            "has_summary": bool(new_item.summary),
+            "has_flashcards": bool(new_item.flashcards),
+            "has_mcqs": bool(new_item.mcqs),
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_v1_router.post("/ask-question")
+async def ask_question_v1(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)    
+):
+    try:
+        body = await request.json()
+        question = body.get("question")
+        library_item_id = body.get("library_item_id")
+
+        if not question or not library_item_id:
+            raise HTTPException(status_code=400, detail="Missing question or library_item_id")
+
+        query_embedding = (await get_openai_embeddings([question]))[0]
+        client = get_qdrant_client()
+
+        qdrant_filter = Filter(
+            must=[
+                FieldCondition(key="user_id", match=MatchValue(value=int(user.id))),
+                FieldCondition(key="library_item_id", match=MatchValue(value=int(library_item_id)))
+            ]
+        )
+
+        search_results = client.search(
+            collection_name=settings.QDRANT_APP_VECTOR,
+            query_vector=query_embedding,
+            limit=5,
+            query_filter=qdrant_filter,
+            with_payload=True,
+            with_vectors=True
+        )
+
+        relevant_chunks = [pt.payload["text_chunk"] for pt in search_results if "text_chunk" in pt.payload]
+
+        if not relevant_chunks:
+            return {"answer": "No relevant content found"}
+
+        answer = ask_llm(question=question, context_chunks=relevant_chunks)
+
+        chat_record = ChatHistory(
+            user_id=user.id,
+            library_item_id=library_item_id,
+            question=question,
+            answer=answer
+        )
+
+        db.add(chat_record)
+        db.commit()
+
+        return {"answer": answer}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_v1_router.get("/chat-history/{library_item_id}")
+def get_chat_history_v1(
+    library_item_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    history = (
+        db.query(ChatHistory)
+        .filter_by(user_id=user.id, library_item_id=library_item_id)
+        .order_by(ChatHistory.created_at.asc())
+        .all()
+    )
+    return [
+        {
+            "id": chat.id,
+            "question": chat.question,
+            "answer": chat.answer,
+            "timestamp": chat.created_at.isoformat()
+        }
+        for chat in history
+    ]
+
 # Register internal API routes
 app.include_router(api_router)
+app.include_router(api_v1_router)
 
 # # --- Static frontend (React/Vite) ---
 # Serve /assets folder inside dist/assets at /assets URL

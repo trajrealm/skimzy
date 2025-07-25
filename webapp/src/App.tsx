@@ -1,5 +1,6 @@
 import {  Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuthContext';
 import LoginPage from './pages/LoginPage';
 import LibraryPage from './pages/LibraryPage';
 import LibraryItemDetailPage from "./pages/LibraryItemDetailPage";

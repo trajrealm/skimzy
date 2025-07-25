@@ -1,19 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen } from "lucide-react";
-
-
-interface LibraryItem {
-  id: string;
-  title: string;
-  source: string;
-  dateAdded: string;
-  hasSummary: boolean;
-  hasFlashcards: boolean;
-  hasQA: boolean;
-}
-
-export type { LibraryItem };
+import { LibraryItem } from "../types/api";
+import { formatDate } from "../utils";
 
 // Define distinct pastel colors and matching icons
 const colorSets = [
@@ -68,7 +57,7 @@ const LibraryItemCard: React.FC<{ item: LibraryItem; onDelete: (id: string) => v
           Source
         </a>
         <p className="text-xs text-gray-500 mb-3">
-          Added on: {new Date(item.dateAdded).toLocaleDateString()}
+          Added on: {formatDate(item.dateAdded)}
         </p>
   
         <div className="flex flex-wrap gap-2">

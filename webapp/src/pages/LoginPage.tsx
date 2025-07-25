@@ -1,87 +1,83 @@
 import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { useAuthOperations } from "../hooks";
+import { isValidEmail, validatePassword, formatErrorMessage } from "../utils";
 
 export default function AuthPage() {
-  const { login } = useAuth();
+  const { login, signup, isLoading, error: authError, clearError } = useAuthOperations();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const navigate = useNavigate();
+
+  function validateForm(): boolean {
+    const errors: string[] = [];
+    
+    if (!email) {
+      errors.push("Email is required");
+    } else if (!isValidEmail(email)) {
+      errors.push("Please enter a valid email address");
+    }
+    
+    if (!password) {
+      errors.push("Password is required");
+    }
+    
+    if (!isLogin) {
+      if (!confirmPassword) {
+        errors.push("Please confirm your password");
+      } else if (password !== confirmPassword) {
+        errors.push("Passwords do not match");
+      }
+      
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        errors.push(...passwordValidation.errors);
+      }
+    }
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    clearError();
+    setValidationErrors([]);
 
-    if (!email || !password) {
-      setError("Please fill all required fields");
+    if (!validateForm()) {
       return;
     }
-
-    if (!isLogin && password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    setLoading(true);
 
     try {
-      const url = isLogin
-        ? `${BACKEND_URL}/api/auth/login`
-        : `${BACKEND_URL}/api/auth/signup`;
-
-      let options: RequestInit;
-
       if (isLogin) {
-        // Login expects form-urlencoded
-        const body = new URLSearchParams();
-        body.append("username", email);
-        body.append("password", password);
-        options = {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: body.toString(),
-        };
+        await login(email, password);
+        navigate("/library");
       } else {
-        // Signup expects JSON with email & password (adjust if backend differs)
-        options = {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        };
-      }
-
-      const response = await fetch(url, options);
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.detail || "Authentication failed");
-      } else {
-        if (isLogin) {
-          localStorage.setItem("access_token", data.access_token);
-          login(data.access_token);
-          // window.location.href = "/library"; // redirect to dashboard/library
-          navigate("/library")
-        } else {
-          // Signup successful — switch to login view with message
-          alert("Signup successful! Please login now.");
-          setIsLogin(true);
-          setEmail("");
-          setPassword("");
-          setConfirmPassword("");
-        }
+        await signup(email, password);
+        // After successful signup, the user is automatically logged in
+        navigate("/library");
       }
     } catch (err) {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+      // Error is handled by the hook and displayed via authError
+      console.error('Authentication error:', err);
     }
+  }
+
+  const clearForm = () => {
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setValidationErrors([]);
+    clearError();
+  };
+
+  const allErrors = [...validationErrors];
+  if (authError) {
+    allErrors.push(formatErrorMessage(authError));
   }
 
   return (
@@ -162,14 +158,20 @@ export default function AuthPage() {
             </div>
           )}
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {allErrors.length > 0 && (
+            <div className="space-y-1">
+              {allErrors.map((error, index) => (
+                <p key={index} className="text-red-600 text-sm">{error}</p>
+              ))}
+            </div>
+          )}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition duration-200 disabled:opacity-50"
           >
-            {loading ? (isLogin ? "Logging in..." : "Signing up...") : isLogin ? "Log In" : "Sign Up"}
+            {isLoading ? (isLogin ? "Logging in..." : "Signing up...") : isLogin ? "Log In" : "Sign Up"}
           </button>
         </form>
 
@@ -180,10 +182,7 @@ export default function AuthPage() {
               <button
                 onClick={() => {
                   setIsLogin(false);
-                  setError("");
-                  setEmail("");
-                  setPassword("");
-                  setConfirmPassword("");
+                  clearForm();
                 }}
                 className="text-blue-600 hover:underline font-medium"
               >
@@ -196,10 +195,7 @@ export default function AuthPage() {
               <button
                 onClick={() => {
                   setIsLogin(true);
-                  setError("");
-                  setEmail("");
-                  setPassword("");
-                  setConfirmPassword("");
+                  clearForm();
                 }}
                 className="text-blue-600 hover:underline font-medium"
               >

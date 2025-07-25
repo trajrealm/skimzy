@@ -1,80 +1,32 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
 import { useSwipeable } from "react-swipeable";
 import Header from "../components/Header";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import ChatWidget from "../components/ChatWidget";
-
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-interface Flashcard {
-  question: string;
-  answer: string;
-}
-
-interface MCQ {
-  question: string;
-  options: string[];
-  answer: string;
-}
-
-interface LibraryItem {
-  id: number;
-  title: string;
-  source: string;
-  created_at: string;
-  summary: string;
-  flashcards: Flashcard[];
-  mcqs: MCQ[];
-}
+import { useLibraryItem } from "../hooks";
+import { formatErrorMessage, formatDate } from "../utils";
 
 const LibraryItemDetailPage: React.FC = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAuth();
-
-  const [item, setItem] = useState<LibraryItem | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  const { item, isLoading, error, clearError } = useLibraryItem(id || '');
+  
   const [activeTab, setActiveTab] = useState<"summary" | "flashcards" | "mcqs">("summary");
   const [flashIndex, setFlashIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [qIndex: number]: string }>({});
   const [mcqIndex, setMcqIndex] = useState(0);
-  // Add below other useStates
   const [showScore, setShowScore] = useState(false);
   const [score, setScore] = useState(0);
   const [fade, setFade] = useState(true);
 
-  useEffect(() => {
-    const fetchItem = async () => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/library/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch item");
-        const data = await res.json();
-        setItem(data);
-      } catch (err) {
-        console.error("Error loading item:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchItem();
-  }, [id, token]);
-
-  // const [chatOpen, setChatOpen] = useState(false);
-
   const handlers = useSwipeable({
     onSwipedLeft: () => {
-      if (item && flashIndex < item.flashcards.length - 1) {
+      if (item && item.flashcards && flashIndex < item.flashcards.length - 1) {
         triggerCardTransition(() => {
           setFlashIndex(flashIndex + 1);
           setShowBack(false);
@@ -97,8 +49,34 @@ const LibraryItemDetailPage: React.FC = () => {
 
 
 
-  if (loading) return <div className="p-6 text-center">Loading...</div>;
-  if (!item) return <div className="p-6 text-center text-red-500">Item not found.</div>;
+  if (isLoading) return (
+    <div className="min-h-screen bg-gray-100">
+      <Header />
+      <div className="p-6 text-center">Loading...</div>
+    </div>
+  );
+  
+  if (error) return (
+    <div className="min-h-screen bg-gray-100">
+      <Header />
+      <div className="p-6 text-center">
+        <p className="text-red-500 mb-4">{formatErrorMessage(error)}</p>
+        <button 
+          onClick={clearError}
+          className="text-blue-600 hover:underline"
+        >
+          Try again
+        </button>
+      </div>
+    </div>
+  );
+  
+  if (!item) return (
+    <div className="min-h-screen bg-gray-100">
+      <Header />
+      <div className="p-6 text-center text-red-500">Item not found.</div>
+    </div>
+  );
 
   const triggerCardTransition = (updateCard: () => void) => {
     setFade(false); // start fade-out
@@ -132,7 +110,7 @@ const LibraryItemDetailPage: React.FC = () => {
           >
             Source
           </a>
-          <p className="text-xs text-gray-500 mb-6">Added on: {new Date(item.created_at).toLocaleDateString()}</p>
+          <p className="text-xs text-gray-500 mb-6">Added on: {formatDate(item.created_at || item.dateAdded)}</p>
 
           {/* Tabs */}
           <div className="flex space-x-4 border-b mb-6">
@@ -140,7 +118,7 @@ const LibraryItemDetailPage: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => {
-                  setActiveTab(tab as any);
+                  setActiveTab(tab as "summary" | "flashcards" | "mcqs");
                   setFlashIndex(0);
                   setShowBack(false);
                 }}
@@ -219,7 +197,7 @@ const LibraryItemDetailPage: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    if (flashIndex < item.flashcards.length - 1) {
+                    if (item.flashcards && flashIndex < item.flashcards.length - 1) {
                       triggerCardTransition(() => {
                         setShowBack(false); // Reset to front
                         setFlashIndex(flashIndex + 1);
@@ -241,16 +219,16 @@ const LibraryItemDetailPage: React.FC = () => {
 
 
           {/* MCQs */}
-          {activeTab === "mcqs" && item.mcqs?.length > 0 && (
+          {activeTab === "mcqs" && item.mcqs && item.mcqs.length > 0 && (
             <div className="flex flex-col items-center space-y-6 w-full">
               {!showScore ? (
                 <>
                   <div className="w-full">
                     <p className="font-medium text-gray-800 mb-2 text-lg">
-                      {mcqIndex + 1}. {item.mcqs[mcqIndex].question}
+                      {mcqIndex + 1}. {item.mcqs![mcqIndex].question}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {item.mcqs[mcqIndex].options.map((opt) => {
+                      {item.mcqs![mcqIndex].options.map((opt) => {
                         const selected = selectedAnswers[mcqIndex] === opt;
                         return (
                           <button
@@ -278,8 +256,8 @@ const LibraryItemDetailPage: React.FC = () => {
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setMcqIndex((prev) => Math.min(item.mcqs.length - 1, prev + 1))}
-                      disabled={mcqIndex === item.mcqs.length - 1}
+                      onClick={() => setMcqIndex((prev) => Math.min(item.mcqs!.length - 1, prev + 1))}
+                      disabled={mcqIndex === item.mcqs!.length - 1}
                       className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-40"
                     >
                       <ChevronRight className="w-5 h-5" />
@@ -290,8 +268,8 @@ const LibraryItemDetailPage: React.FC = () => {
                     <button
                       onClick={() => {
                         let correctCount = 0;
-                        item.mcqs.forEach((q, idx) => {
-                          if (selectedAnswers[idx] === q.answer) correctCount++;
+                        item.mcqs!.forEach((q, idx) => {
+                          if (selectedAnswers[idx] === (q.correct_answer || q.answer)) correctCount++;
                         });
                         setScore(correctCount);
                         setShowScore(true);
@@ -314,13 +292,13 @@ const LibraryItemDetailPage: React.FC = () => {
               ) : (
                 <div className="w-full bg-white rounded-lg p-6 shadow space-y-6 border border-gray-200">
                   <p className="text-xl font-bold text-center text-green-700">
-                    Your Score: {score} / {item.mcqs.length}
+                    Your Score: {score} / {item.mcqs!.length}
                   </p>
                   <h3 className="text-md font-semibold text-gray-800">Your Results:</h3>
                   <div className="space-y-4">
-                    {item.mcqs.map((q, idx) => {
+                    {item.mcqs!.map((q, idx) => {
                       const userAnswer = selectedAnswers[idx];
-                      const isCorrect = userAnswer === q.answer;
+                      const isCorrect = userAnswer === (q.correct_answer || q.answer);
                       return (
                         <div key={idx} className="p-4 rounded border bg-gray-50">
                           <p className="font-medium">{idx + 1}. {q.question}</p>
@@ -333,7 +311,7 @@ const LibraryItemDetailPage: React.FC = () => {
                           {!isCorrect && (
                             <p>
                               Correct Answer:{" "}
-                              <span className="text-green-700 font-medium">{q.answer}</span>
+                              <span className="text-green-700 font-medium">{q.correct_answer || q.answer}</span>
                             </p>
                           )}
                         </div>
@@ -354,7 +332,7 @@ const LibraryItemDetailPage: React.FC = () => {
           )}
         </div>
       </div>
-      <ChatWidget libraryItemId={item.id} />
+      <ChatWidget libraryItemId={parseInt(item.id)} />
     </>
   );
 };
