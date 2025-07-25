@@ -6,20 +6,27 @@ from fastapi import HTTPException
 from urllib.parse import urlparse
 import tempfile
 
+_s3_client = None
 
-s3_client = boto3.client(
-    "s3",
-    aws_access_key_id=settings.B2_APPLICATION_KEY_ID,
-    aws_secret_access_key=settings.B2_APPLICATION_KEY,
-    endpoint_url=f"https://{settings.B2_S3_ENDPOINT}",
-    region_name=settings.B2_S3_REGION,
-    config=Config(signature_version="s3v4"),
-)
+def get_s3_client():
+    """Get S3 client instance (lazy initialization)."""
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=settings.B2_APPLICATION_KEY_ID,
+            aws_secret_access_key=settings.B2_APPLICATION_KEY,
+            endpoint_url=f"https://{settings.B2_S3_ENDPOINT}",
+            region_name=settings.B2_S3_REGION,
+            config=Config(signature_version="s3v4"),
+        )
+    return _s3_client
 
 def upload_pdf_to_b2(file_bytes: bytes, filename: str, user_id: int) -> str:
     """
     Uploads a PDF file to Backblaze B2 (S3-compatible) and returns the public URL.
     """
+    s3_client = get_s3_client()
     object_key = f"{settings.B2_USERS_FOLDER}/{user_id}/{uuid4()}__{filename}"
 
     s3_client.put_object(
@@ -33,6 +40,7 @@ def upload_pdf_to_b2(file_bytes: bytes, filename: str, user_id: int) -> str:
 
 
 def download_file_from_s3(s3_url: str) -> str:
+    s3_client = get_s3_client()
     parsed = urlparse(s3_url)    
     bucket = settings.B2_BUCKET_NAME
     key = parsed.path.lstrip('/')
