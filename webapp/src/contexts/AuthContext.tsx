@@ -1,22 +1,8 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
-
-interface DecodedToken {
-  sub: number;
-  email?: string;
-  exp: number;
-}
-
-interface AuthContextType {
-  token: string | null;
-  user: DecodedToken | null;
-  login: (token: string) => void;
-  logout: () => void;
-}
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext, DecodedToken } from "./AuthContextTypes";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 
