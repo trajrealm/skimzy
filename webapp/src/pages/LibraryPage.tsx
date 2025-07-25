@@ -1,129 +1,52 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import Header from "../components/Header";
 import AddContentForm from "../components/AddContentForm";
-import LibraryItemCard, { LibraryItem } from "../components/LibraryItemCard";
-// import { useNavigate } from "react-router-dom";
+import LibraryItemCard from "../components/LibraryItemCard";
 import { Loader2 } from "lucide-react";
-
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { useLibrary } from "../hooks";
+import { formatErrorMessage } from "../utils";
 
 const LibraryPage: React.FC = () => {
-  const [items, setItems] = useState<LibraryItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { 
+    items, 
+    isLoading, 
+    error, 
+    generateFromUrl, 
+    uploadPdf, 
+    deleteLibraryItem,
+    clearError 
+  } = useLibrary();
+  
   const [isGenerating, setIsGenerating] = useState(false);
-  const token = localStorage.getItem("access_token");
-  // const navigate = useNavigate();
-
-  const didFetchRef = useRef(false);
-
-  useEffect(() => {
-    if (!didFetchRef.current) {
-      console.log("useEffect called");
-      fetchLibraryItems();
-      didFetchRef.current = true;        
-    }
-  }, []);
-
-  const fetchLibraryItems = async () => {
-    console.log("fetchLibraryItems called");
-    setLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/library`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error("Failed to fetch library items");
-
-      const data = await res.json();
-
-      const adaptedItems: LibraryItem[] = data.map((item: any) => ({
-        id: item.id.toString(),
-        title: item.title,
-        source: item.source,
-        dateAdded: item.created_at,
-        hasSummary: !!item.snippet,
-        hasFlashcards: false,
-        hasQA: false,
-      }));
-
-      setItems(adaptedItems);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAdd = async (urlOrFile: string | File) => {
-    console.log("handleAdd called");
     setIsGenerating(true);
+    clearError();
+    
     try {
       if (typeof urlOrFile === "string") {
-        const res = await fetch(`${BACKEND_URL}/api/generate-from-url`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ url: urlOrFile }),
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          alert("Error: " + (errorData.detail || "Failed to add item"));
-          return;
-        }
+        await generateFromUrl(urlOrFile);
       } else {
-        const formData = new FormData();
-        formData.append("file", urlOrFile);
-
-        const res = await fetch(`${BACKEND_URL}/api/upload_pdf/process`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          alert("Error: " + (errorData.detail || "Failed to upload PDF"));
-          return;
-        }
+        await uploadPdf(urlOrFile);
       }
-
-      await fetchLibraryItems();
-    } catch (error) {
-      console.error("Add failed:", error);
-      alert("Failed to add item");
+    } catch (err) {
+      console.error('Error adding content:', err);
+      // Error is already handled by the hook
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // const handleView = (id: string) => {
-  //   console.log("handleView called");
-  //   navigate(`/library/${id}`);
-  // };
-
   const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this item?")) {
+      return;
+    }
+    
     try {
-      const response = await fetch(`${BACKEND_URL}/api/library/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 204) {
-        setItems(items.filter((i) => i.id !== id));
-      } else {
-        const data = await response.json();
-        alert(`Failed to delete: ${data.detail || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      alert("Error deleting item. See console for details.");
+      await deleteLibraryItem(id);
+    } catch (err) {
+      console.error('Error deleting item:', err);
+      // Error is already handled by the hook
     }
   };
 
@@ -133,13 +56,32 @@ const LibraryPage: React.FC = () => {
       <main className="max-w-5xl mx-auto p-6 space-y-6 relative z-10">
         <AddContentForm onAdd={handleAdd} isGenerating={isGenerating} />
 
-        {loading && <div className="text-center">Loading...</div>}
-        {!loading && items.length === 0 && (
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800 text-sm">{formatErrorMessage(error)}</p>
+            <button 
+              onClick={clearError}
+              className="text-red-600 hover:text-red-800 text-xs mt-1 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="text-center">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+            Loading your library...
+          </div>
+        )}
+        
+        {!isLoading && items.length === 0 && (
           <div className="text-center text-gray-500 mt-12">
             Your library is empty. Add a URL or PDF to get started!
           </div>
         )}
-        {!loading && items.length > 0 && (
+        
+        {!isLoading && items.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((item) => (
               <LibraryItemCard
@@ -157,7 +99,6 @@ const LibraryPage: React.FC = () => {
           <div className="flex items-center gap-2 text-gray-700 text-lg font-medium">
             <Loader2 className="w-6 h-6 animate-spin" />
             Preparing your data to make Skim Ready....
-            ...
           </div>
         </div>
       )}

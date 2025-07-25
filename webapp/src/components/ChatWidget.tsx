@@ -1,84 +1,44 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MessageCircle, X } from "lucide-react";
+import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-
-import { useAuth } from "../contexts/AuthContext";
-
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { useChat } from "../hooks";
+import { formatErrorMessage } from "../utils";
 
 const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
-  const { token } = useAuth();
+  const { messages, isLoading, isAsking, error, askQuestion, clearError } = useChat(libraryItemId);
   const [isOpen, setIsOpen] = useState(false);
-  //   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [messages, setMessages] = useState<
-    { role: string; text: string; timestamp?: string }[]>([]);
-
   const toggleChat = () => setIsOpen(!isOpen);
 
-  useEffect(() => {
-    if (!isOpen || !libraryItemId) return;
-    fetch(`${BACKEND_URL}/api/chat-history/${libraryItemId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => {
-        if (!res.ok) throw new Error("Failed to fetch chat history");
-        return res.json();
-      })
-      .then(data => {
-        // Sort by created_at if available
-        const msgs = data.flatMap(({ question, answer, timestamp }: { question: string; answer: string; timestamp?: string }) => [
-          { role: "user", text: question, timestamp },
-          { role: "assistant", text: answer, timestamp },
-        ]);
-        setMessages(msgs);
-      })
-      .catch(async (err) => {
-        console.error("Fetch error:", err);
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/chat-history/${libraryItemId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const text = await res.text();
-          console.error("Raw response text:", text);
-        } catch (e) {
-          console.error("Error fetching or reading raw response:", e);
-        }
-      });
-  }, [isOpen, libraryItemId, token]); // These are all primitives or strings — correct
-
-  useEffect(() => {
-    if (!isOpen) {
-      setMessages([]);
-    }
-  }, [isOpen]);
-
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const question = input;
-    setMessages((prev) => [...prev, { role: "user", text: question }]);
+  const handleSend = async () => {
+    if (!input.trim() || isAsking) return;
+    
+    const question = input.trim();
     setInput("");
-
+    
     try {
-      const res = await fetch(`${BACKEND_URL}/api/ask-question`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ question, library_item_id: libraryItemId }),
-      });
-
-      const data = await res.json();
-      setMessages((prev) => [...prev, { role: "assistant", text: data.answer }]);
+      await askQuestion(question);
     } catch (err) {
-      console.error("Chat error:", err);
-      setMessages((prev) => [...prev, { role: "assistant", text: "Something went wrong." }]);
+      console.error('Error sending message:', err);
+      // Error is already handled by the hook
     }
   };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
@@ -99,6 +59,25 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
             <button onClick={toggleChat}><X className="w-5 h-5" /></button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                <p className="text-red-800 text-xs">{formatErrorMessage(error)}</p>
+                <button 
+                  onClick={clearError}
+                  className="text-red-600 hover:text-red-800 text-xs mt-1 underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+            
+            {isLoading && messages.length === 0 && (
+              <div className="text-center text-gray-500 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+                Loading chat history...
+              </div>
+            )}
+            
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -133,6 +112,15 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
                 </div>
               </div>
             ))}
+            
+            {isAsking && (
+              <div className="flex justify-end mb-3">
+                <div className="bg-green-200 text-gray-900 p-3 rounded-lg text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </div>
           <div className="p-2 border-t flex items-center space-x-2">
@@ -140,14 +128,21 @@ const ChatWidget: React.FC<{ libraryItemId: number }> = ({ libraryItemId }) => {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              className="flex-1 px-3 py-1 border rounded-lg text-sm"
+              onKeyDown={handleKeyPress}
+              disabled={isAsking}
+              className="flex-1 px-3 py-1 border rounded-lg text-sm disabled:opacity-50"
               placeholder="Type a question..."
             />
             <button
-              onClick={sendMessage}
-              className="text-white bg-indigo-600 px-3 py-1 rounded-lg text-sm hover:bg-indigo-700"
+              onClick={handleSend}
+              disabled={isAsking || !input.trim()}
+              className="text-white bg-indigo-600 px-3 py-1 rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             >
+              {isAsking ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Send className="w-3 h-3" />
+              )}
               Send
             </button>
           </div>
